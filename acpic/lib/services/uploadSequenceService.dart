@@ -204,7 +204,7 @@ class UploadSequenceService {
     await streamListener();
   }
 
-  uploadMain(BuildContext context, int id, String csrf, String cookie,
+  uploadMain2(BuildContext context, int id, String csrf, String cookie,
       List tags, bool isUploadCancel, List<AssetEntity> list) {
     uploadRecurrence() async {
       if (list.isEmpty) {
@@ -219,6 +219,41 @@ class UploadSequenceService {
     }
 
     uploadRecurrence();
+  }
+
+  uploadMain(BuildContext context, int id, String csrf, String cookie, List tags, bool isUploadCancel, List<AssetEntity> list) {
+    recursiveUpload() async {
+      if (list.isEmpty) {
+        print('upload finished');
+        return 0;
+      }
+      var asset = list[0];
+      var piv = asset.file;
+      print('DEBUG remaining ' + list.length.toString ());
+      list.removeAt(0);
+      File image = await piv;
+      var stream = new http.ByteStream(image.openRead());
+      stream.cast();
+      var length = await image.length();
+      var uri = Uri.parse('https://altocode.nl/picdev/piv');
+      var request = http.MultipartRequest('POST', uri);
+      try {
+        request.headers['cookie'] = cookie;
+        request.fields['id'] = id.toString();
+        request.fields['csrf'] = csrf;
+        request.fields['tags'] = tags.toString();
+        request.fields['lastModified'] = asset.modifiedDateTime.millisecondsSinceEpoch.abs().toString();
+        var upiv = http.MultipartFile('piv', stream, length, filename: basename(image.path));
+        request.files.add(upiv);
+        var response = await request.send();
+        final respStr = await response.stream.bytesToString();
+        print('DEBUG response ' + response.statusCode.toString() + ' ' + respStr);
+        recursiveUpload();
+      } on SocketException catch (_) {
+        return 0;
+      }
+    }
+    recursiveUpload();
   }
 }
 
